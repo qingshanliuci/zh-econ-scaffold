@@ -108,6 +108,10 @@ def check_first(p, sents):
     par = [i + 1 for i, s in enumerate(sents) if re.match(r'^(此外|另外|同时|与此同时|除此之外|还有|再者)[，,]', s)]
     if par:
         hints.append('第 ' + '、'.join(map(str, par)) + ' 句以并列连接词起句：顶刊首段里并列很少，下一句应从上一句推出来，不是换一张材料')
+    # 分号并句：顶刊引言开头 600 字 15762 句里含分号 8 句（0.05%），分号后半多是另起话题或并排推进来的核心变量（references/sentence-chaining.md 规矩 9）
+    semi = [i + 1 for i, s in enumerate(sents) if '；' in s]
+    if semi:
+        hints.append('第 ' + '、'.join(map(str, semi)) + ' 句含分号：顶刊引言开头几乎不用分号（15762 句里 8 句），分号后半多半是另起的话题，拆成两句再判关系，或删掉后半')
     docs = list(dict.fromkeys(re.findall(r'《([^》]+)》', p)))
     nq = len(quotes(p))
     nnum = sum(1 for s in sents if re.search(r'\d', CITE_RE.sub('', s)))
