@@ -30,7 +30,7 @@ git clone https://github.com/qingshanliuci/zh-econ-scaffold.git ~/.claude/skills
 
 然后新开一个 Claude Code 会话，说"我要写论文引言，第一段怎么规划"就会触发。也可以直接输入 `/zh-econ-scaffold`。
 
-**其他 AI 工具的用户**（Codex、Cursor、网页版 Claude 或 ChatGPT）：`SKILL.md` 本身就是一份完整的流程说明，把它和 `templates/` 里的模板贴给模型即可；`references/` 十份规则按要写的部位贴。脚本需要 Python 3，没有第三方依赖。
+**其他 AI 工具的用户**（Codex、Cursor、网页版 Claude 或 ChatGPT）：`SKILL.md` 本身就是一份完整的流程说明，把它和 `templates/` 里的模板贴给模型即可；`references/` 十一份规则按要写的部位贴。脚本需要 Python 3，没有第三方依赖。
 
 ## 用之前准备什么
 
@@ -53,14 +53,15 @@ git clone https://github.com/qingshanliuci/zh-econ-scaffold.git ~/.claude/skills
 
 ```
 SKILL.md                    流程说明（AI 读的主文件）
-templates/                  七份模板：事实清单、范文拆解、引言规划（含贡献点表）、对照表与自检、审稿人提示、摘要句链、政策建议规划
-references/                 十份规则：思路库（四路十六式）、32 类句子功能与骨架、首段末句怎样把问题立住、
+templates/                  八份模板：事实清单、范文拆解、引言规划（含贡献点表）、对照表与自检、审稿人提示、摘要句链、政策建议规划、文献综述规划
+references/                 十一份规则：思路库（四路十六式）、32 类句子功能与骨架、首段末句怎样把问题立住、文献综述节怎么写、
                             每段第一句怎么写、贡献段与创新点怎么写、摘要怎么写、结论与政策建议怎么写、衔接词与用词规则、各节第一句的骨架与禁区词、同一段里句与句怎么接
 scripts/find_exemplars.py   在本地论文库里找同题范文
 scripts/lint.py             语感检查：禁用词、句长、"然而"次数、句首衔接词占比；首段另查首句禁区词、
                             材料密度（文件全名、引号原话、含数字句、法条）、相邻两句跳材料，首句是定义或数据时给提示
 scripts/phrase_freq.py      候选句的片段、骨架、禁区词在顶刊各节第一句里出现多少篇（需本地统计表 节首句.tsv）
 scripts/quote_check.py      引号内文字到政策原文或 gov.cn 页面逐字比对
+scripts/lit_check.py        文献综述节机械检查：引用密度与放法、按作者排队、缺口与"本文"的位置、总起与分支对不对得上、衔接词、空话
 scripts/regress/            回归测试：几家模型按同一输入重写同一段，机械校加句间关系盲标出 13 项分数表并记历史（见其 README.md）
 examples/                   一份填好的规划表：最低工资与企业劳动收入份额
 ```
