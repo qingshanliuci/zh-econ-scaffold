@@ -104,6 +104,10 @@ def check_first(p, sents):
             func.append('理论引述')
         if func:
             hints.append(f'首句功能是 {"／".join(func)}，作者要求首段第一句是盖帽子的判断（定性 34.7%、政策引述 19.0% 为常见）')
+    # 并列连接词起句：后一句只是换一张材料的信号（references/sentence-chaining.md）
+    par = [i + 1 for i, s in enumerate(sents) if re.match(r'^(此外|另外|同时|与此同时|除此之外|还有|再者)[，,]', s)]
+    if par:
+        hints.append('第 ' + '、'.join(map(str, par)) + ' 句以并列连接词起句：顶刊首段里并列很少，下一句应从上一句推出来，不是换一张材料')
     docs = list(dict.fromkeys(re.findall(r'《([^》]+)》', p)))
     nq = len(quotes(p))
     nnum = sum(1 for s in sents if re.search(r'\d', CITE_RE.sub('', s)))
