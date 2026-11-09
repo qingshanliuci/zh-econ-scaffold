@@ -54,16 +54,23 @@ python3 scripts/regress/history.py --case <用例名> --last 5
 |---|---|---|
 | `build_bundle.py` | 拼 `输入包.md`：题目 → SKILL.md 与六份规则 → 材料 → "现在开始"；记 `输入包_meta.json`（技能 commit、是否有未提交改动、各文件 sha1） | `--case`、`--out`、`--rules` |
 | `run_models.py` | 各模型并行写，存 `输出_<模型>[_nothink]_r<k>.md` 与同名 `_meta.json`、`_reasoning.md` | `--models deepseek-flash,deepseek-v4-pro,opus`、`--reps`、`--no-think`、`--opus-via cli\|file` |
-| `judge.py` | 抽正文、按目录名定种子打乱成 甲乙丙…，交裁判标相邻句关系 | `--judge cli\|deepseek\|file`、`--judge-model`、`--judges N`、`--ingest`、`--suffix` |
+| `judge.py` | 抽正文、按目录名定种子打乱成 甲乙丙…，交裁判标相邻句关系（默认每段单独一次、并行） | `--judge cli\|deepseek\|file`、`--judge-model`、`--batch`、`--judges N`、`--ingest`、`--suffix` |
 | `score.py` | 调 lint / quote_check / phrase_freq 加盲标结果，出 `分数表.md`、`分数.json`，写历史 | `--suffix` |
-| `history.py` | 按用例、模型打印最近几次分数 | `--case`、`--last` |
-| `run_all.py` | 串起以上四步 | `--case`、`--only-score`、`--judge`、`--judge-model`、`--suffix` |
+| `history.py` | 按用例、模型打印最近几个 run 的分数；同一 run 的各 rep 各占一行，多 rep 再加一行均值（总分、换话题并列、推进率） | `--case`、`--last`（按 run 计数） |
+| `run_all.py` | 串起以上四步 | `--case`、`--only-score`、`--judge`、`--judge-model`、`--batch`、`--suffix` |
 
 DeepSeek 的密钥从 `~/.claude/secrets/deepseek_search.env` 的 `DEEPSEEK_API_KEY=` 读，只进请求头，不打印、不写文件。
 
 claude 命令行后端固定用 `claude -p --model <模型> --no-session-persistence --output-format json --setting-sources project --system-prompt …`，提示从 stdin 喂，子进程在空临时目录里跑，避免读到用户自己的 CLAUDE.md。不要加 `--bare`（会跳过登录凭据）。
 
 同一个 run 换裁判再判一次：给 `--suffix`（如 `_deepseek`），结果存 `盲标结果_deepseek.json`、`分数表_deepseek.md`，历史表里 run_id 也带这个后缀；表头写明裁判是谁。盲标顺序由目录名决定，换裁判不变。
+
+裁判两种模式：
+
+- **按段并行（默认，perpara）**：每段单独一次调用，提示 = `judge_prompt.md` + X/Y 一行 + 只含这一段的盲标输入（标签仍是它在 `盲标顺序.json` 里的标签），各段用线程并行（cli 与 deepseek 都支持）。各段结果合成与整批相同的 `{"段落": [...]}`，按标签顺序；**每段对象里多一个 `一句话` 字段**，顶层没有 `一句话`。裁判只看一段，判断不受别的段影响，墙钟时间约等于最慢的一段。某段解析失败，原文存 `盲标结果<后缀>_原文_<标签>.txt`，退出码 3。
+- **整批（`--batch`）**：所有段一次交给裁判，顶层 `一句话` 是一句比较。
+
+`score.py` 两种结构都认。`盲标_meta<后缀>.json` 记 后端、模型、模式（perpara／batch）、每段秒数、总秒数、成本（claude 命令行的 total_cost_usd 之和）。file 模式总是整批写一份 `待判_裁判提示.md`。
 
 `--judges N` 判 N 次，逐对多数票（并列／非并列，平票算并列）。
 

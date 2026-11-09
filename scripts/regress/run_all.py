@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# INPUT: --case 用例目录；--models、--reps 传给 run_models；--judge cli|deepseek|file、--judge-model、--suffix 传给 judge 与 score；--only-score RUN_DIR 跳过拼包与写手，只对已有输出盲标与打分
+# INPUT: --case 用例目录；--models、--reps 传给 run_models；--judge cli|deepseek|file、--judge-model、--batch、--suffix 传给 judge 与 score；--only-score RUN_DIR 跳过拼包与写手，只对已有输出盲标与打分
 # OUTPUT: 顺序跑 build_bundle → run_models → judge → score，最后打印分数表路径与 history.py 的本用例摘要；opus 或裁判走 file 模式时打印还缺哪一步、文件在哪，退出码 0
 # POS: 回归测试的一键入口
 import argparse, pathlib, subprocess, sys
@@ -22,6 +22,7 @@ def main():
     ap.add_argument("--reps", type=int, default=1)
     ap.add_argument("--judge", choices=["cli", "deepseek", "file"], default="cli")
     ap.add_argument("--judge-model", help="cli 默认 opus；deepseek 默认 deepseek-v4-pro")
+    ap.add_argument("--batch", action="store_true", help="裁判整批一次判；默认按段并行")
     ap.add_argument("--suffix", default="", help="盲标结果与分数表文件名后缀，同一 run 换裁判时区分")
     ap.add_argument("--only-score", metavar="RUN_DIR")
     a = ap.parse_args()
@@ -49,7 +50,7 @@ def main():
         sys.exit(f"{run} 里没有 输出_*.md")
     S = a.suffix
     jargs = ["--run", str(run), "--judge", a.judge] + (["--judge-model", a.judge_model] if a.judge_model else []) \
-        + (["--suffix", S] if S else [])
+        + (["--suffix", S] if S else []) + (["--batch"] if a.batch else [])
     step("judge.py", *jargs)
     if not ((run / f"盲标结果{S}.json").exists() or list(run.glob(f"盲标结果{S}_[0-9]*.json"))):
         sx = f" --suffix {S}" if S else ""

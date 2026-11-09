@@ -166,7 +166,8 @@ def judge_who(run, suffix, n):
     if not p.exists():
         return f"未记录 ×{n}"
     j = json.loads(read(p))
-    return f"{j.get('后端')} {j.get('模型')} ×{n}"
+    mode = {"perpara": "，按段并行", "batch": "，整批"}.get(j.get("模式"), "")
+    return f"{j.get('后端')} {j.get('模型')}{mode} ×{n}"
 
 
 HIST_COLS = ["run_id", "日期", "用例", "技能commit", "脏否", "模型", "rep", "总分", "通过项", "换话题并列", "伪翻转",
@@ -208,7 +209,12 @@ def score(run, suffix=""):
     for j in judges:
         for d in j["段落"]:
             per_label[d["标签"]].append(d)
-    one_line = [j.get("一句话", "") for j in judges]
+    # 一句话：整批模式在顶层（字符串）；按段模式在每段对象里
+    one_line = []
+    for j in judges:
+        if isinstance(j.get("一句话"), str) and j["一句话"]:
+            one_line.append(j["一句话"])
+        one_line += [f"{d['标签']}：{d['一句话']}" for d in j["段落"] if d.get("一句话")]
 
     res = []
     for path, model, rep in outputs(run):
