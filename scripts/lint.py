@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # INPUT: 一个 markdown 或纯文本稿；默认只检查以 "> " 开头的引文块（正文），--all 检查全部非标题段落
-# OUTPUT: 终端报告：禁用词、叙事时间词、"然而"每段次数、句首引导词后缺逗号、收段轻词、句长、句首衔接词占比；首段另查首句禁区词与"本文"起句、材料密度（文件全名、引号原话、含数字句、法条）、相邻两句跳材料，首句功能是定义／数据／文件／理论引述时给"提示"（不计入问题数）；--json 输出机器可读；有问题退出码 1
+# OUTPUT: 终端报告：禁用词、叙事时间词、"然而"每段次数、句首引导词后缺逗号、收段轻词、句长、句首衔接词占比（每段过高、全文过低）、用词核对表（顶刊引言很少用的说法与换法）；首段另查首句禁区词与"本文"起句、材料密度（文件全名、引号原话、含数字句、法条）、相邻两句跳材料，首句功能是定义／数据／文件／理论引述时给"提示"（不计入问题数）；--json 输出机器可读；有问题退出码 1
 # POS: zh-econ-scaffold 工具层的语感 lint：机械能查的先机械查，查不出的留给审稿人；规则来自 2370 篇顶刊的衔接词与用词统计、3351 篇各节第一句统计（references/first-sentences.md）
 import re, sys, json, argparse
 
@@ -17,6 +17,23 @@ OPENERS = ['此外', '然而', '另一方面', '一方面', '其次', '再次', 
 # 顶刊里不开句的句中缝合词
 NO_OPEN = ['但', '而', '即', '从而', '进而', '使得', '导致', '则', '并且', '而且', '却']
 CONN_START = OPENERS + NO_OPEN + ['但是', '所以', '于是', '并']
+
+# 用词核对表（references/register-rules.md，2026-11-10 据 2021 年以来顶刊引言 1873 篇）：
+# (说法, 正则, 顶刊篇频, 换法, 全文允许次数)
+WORD_TABLE = [
+    ('随之', r'随之', '5.4%', '相应（17.1%），或缝成"……，从而……"', 0),
+    ('……以后', r'[一-鿿]以后', '4.8%', '……之后（11.4%）、……后', 0),
+    ('怎样', r'怎样', '6.8%', '如何（64.2%）', 0),
+    ('抬高', r'抬高', '1.6%', '提高（63.9%）、增加', 0),
+    ('推高', r'推高', '3.0%', '提高（63.9%）、增加', 0),
+    ('压低', r'压低', '0.9%', '降低（56.1%）', 0),
+    ('由此看来', r'由此看来', '1 篇', '因此（由此可见也只有 6.8% 的篇用）', 0),
+    ('照章', r'照章', '0 篇', '依法（3.0%）、按规定', 0),
+    ('落到／落在', r'落到|落在', '3 篇', '在企业层面、从微观层面看、具体到', 0),
+    ('究竟／到底', r'究竟|到底', '6.0%／1.7%', '问句直接写"是否""如何"', 1),
+    ('取决于', r'取决于', '10.5%', '多出的改写成具体关系，如"受……影响"', 2),
+]
+CONN_SHARE_LOW = 0.10   # 全文句首衔接词占比下限（按本脚本的算法）：20 篇顶刊原文中位 21%、3 篇低于 10%；整套技能回写稿中位 7%
 
 # 首句禁区词：2547 篇引言第一句里的篇数（references/first-sentences.md），None 表示"接近零"
 FIRST_BANNED = {'系于': 0, '归根结底': 2, '毋庸置疑': 2, '众所周知': 2, '值得注意的是': 2, '不可忽视的是': None,
@@ -186,6 +203,23 @@ def check_paragraph(idx, p, first=False):
     return r
 
 
+def check_whole(paras, reports):
+    """全文一级：用词核对表（问题）、句首衔接词占比过低（提示：20 篇顶刊原文里有 3 篇也低于下限）"""
+    text = ''.join(paras)
+    issues, hints = [], []
+    for name, pat, df, alt, allow in WORD_TABLE:
+        n = len(re.findall(pat, text))
+        if n > allow:
+            lim = f'，一篇至多 {allow} 次' if allow else ''
+            share = f'只有 {df}' if df.endswith('篇') else f'只有 {df} 的篇'
+            issues.append(f'「{name}」{n} 次：顶刊引言{share}用{lim}，换成 {alt}')
+    ns = sum(r['句数'] for r in reports)
+    nc = sum(r['句首衔接词'] for r in reports)
+    if ns >= 10 and nc / ns < CONN_SHARE_LOW:
+        hints.append(f'句首衔接词 {nc}/{ns} 句（{nc / ns:.0%}），偏少：按本脚本算，顶刊原文中位 21%，大约每五句一个；太少读者看不见句间关系')
+    return issues, hints
+
+
 def main():
     ap = argparse.ArgumentParser(description='中文经济学稿件语感 lint')
     ap.add_argument('file')
@@ -203,9 +237,11 @@ def main():
         seen[sec] = seen.get(sec, 0) + 1
         first = not a.no_first and seen[sec] == a.first_para
         reports.append(check_paragraph(i + 1, p, first))
-    bad = sum(len(r['问题']) for r in reports)
+    whole, whole_hints = check_whole([p for _, p in paras], reports)
+    bad = sum(len(r['问题']) for r in reports) + len(whole)
     if a.json:
-        print(json.dumps({'段落': reports, '问题总数': bad, '提示总数': sum(len(r['提示']) for r in reports)},
+        print(json.dumps({'段落': reports, '全文': {'问题': whole, '提示': whole_hints}, '问题总数': bad,
+                          '提示总数': sum(len(r['提示']) for r in reports) + len(whole_hints)},
                          ensure_ascii=False, indent=1))
     else:
         for r in reports:
@@ -216,7 +252,13 @@ def main():
                 print('  - ' + it)
             for it in r['提示']:
                 print('  · 提示：' + it)
-        nh = sum(len(r['提示']) for r in reports)
+        if whole or whole_hints:
+            print('全文：')
+            for it in whole:
+                print('  - ' + it)
+            for it in whole_hints:
+                print('  · 提示：' + it)
+        nh = sum(len(r['提示']) for r in reports) + len(whole_hints)
         tail = f'，另有 {nh} 条提示' if nh else ''
         print((f'共 {len(reports)} 段，{bad} 个问题' if bad else f'共 {len(reports)} 段，未发现问题') + tail)
     sys.exit(1 if bad else 0)
